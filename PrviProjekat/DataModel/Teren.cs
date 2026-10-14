@@ -11,7 +11,21 @@
         public int MaxX { get; set; }
         public int MaxY { get; set; }
     }
-
+    public class PodaciGrida
+    {
+        public int Sirina { get; set; }
+        public int Visina { get; set; }
+        public byte[] GridBitMemorija { get; set; }
+        public List<Ostrvo> Ostrva { get; set; } = new();
+        public PodaciGrida()
+        {
+            Sirina = 4; // Primer širine
+            Visina = 4; // Primer visine
+            int ukupnoCelija = 16;
+            int velicinaNizaBajtova = (ukupnoCelija + 3) / 4;
+            GridBitMemorija = new byte[velicinaNizaBajtova];
+        }
+    }
     /// <summary>
     /// Upravlja gridom terena, memorijom i bit-mapom stanja.
     /// </summary>
