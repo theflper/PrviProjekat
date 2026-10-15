@@ -14,6 +14,7 @@ namespace PrviProjekat
         {
             labelN.Text = "N = " + data.Visina;
             labelM.Text = "M = " + data.Sirina;
+            RedisManager.Inicijalizuj();
             trenutniTeren = new Teren(pictureBoxTeren.Width, pictureBoxTeren.Height);
         }
 
