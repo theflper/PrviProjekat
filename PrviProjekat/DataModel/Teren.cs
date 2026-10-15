@@ -26,6 +26,11 @@
             GridBitMemorija = new byte[velicinaNizaBajtova];
         }
     }
+    public class VezaMosta
+    {
+        public int Ostrvo1Id { get; set; }
+        public int Ostrvo2Id { get; set; }
+    }
     /// <summary>
     /// Upravlja gridom terena, memorijom i bit-mapom stanja.
     /// </summary>
@@ -65,7 +70,41 @@
             int velicinaNizaBajtova = (ukupnoCelija + 3) / 4;
             _gridBitMemorija = new byte[velicinaNizaBajtova];
         }
+        public List<VezaMosta> PronadjiVezeMostova()
+        {
+            var veze = new List<VezaMosta>();
 
+            // Prolazimo kroz sve ćelije grida da nađemo mostove (vrednost 1)
+            for (int x = 0; x < Sirina; x++)
+            {
+                for (int y = 0; y < Visina; y++)
+                {
+                    if (VratiStanjeCelije(x, y) == 1) // Ako je most
+                    {
+                        // Proveravamo susede (gore, dole, levo, desno) da vidimo koja ostrva ovaj most spaja
+                        var susednaOstrvaIds =
+                            new int[] {
+                        VratiStanjeCelije(x - 1, y),
+                        VratiStanjeCelije(x + 1, y),
+                        VratiStanjeCelije(x, y - 1),
+                        VratiStanjeCelije(x, y + 1)
+                            }
+                            .Where(id => id != -1)
+                            .Distinct()
+                            .ToList();
+
+                        // Ako most spaja tačno dva različita ostrva, to je validna veza!
+                        if (susednaOstrvaIds.Count == 2)
+                        {
+                            veze.Add(new VezaMosta { Ostrvo1Id = susednaOstrvaIds[0], Ostrvo2Id = susednaOstrvaIds[1] });
+                        }
+                    }
+                }
+            }
+
+            // Uklanjamo duplikate ako most zauzima više polja između istih ostrva
+            return veze.DistinctBy(v => new { v.Ostrvo1Id, v.Ostrvo2Id }).ToList();
+        }
         /// <summary>
         /// Postavlja stanje za određenu ćeliju (x, y).
         /// stanje: 0 (kopno), 1 (most), 2 (voda), 3 (neiskorišćeno)
