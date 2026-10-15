@@ -1,10 +1,11 @@
 ﻿namespace PrviProjekat.DataModel
 {
     //docker run --name redis-container -p 6379:6379 -d redis
+    //sudo service redis-server start
     internal class RedisManager
     {
         private static ConnectionMultiplexer? _connection;
-        private static readonly string ConnectionString = "localhost:6379";
+        private static readonly string ConnectionString = "localhost:6379,abortConnect=false";
 
         // Inicijalizacija i povezivanje sa Redis-om
         public static void Inicijalizuj()

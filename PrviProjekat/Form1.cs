@@ -10,6 +10,23 @@ namespace PrviProjekat
         }
         PodaciGrida data = new PodaciGrida();
         Teren trenutniTeren;
+        private void SacuvajStanjeZaUndo()
+        {
+            var db = RedisManager.GetDatabase();
+            if (db == null) return;
+
+            // Serijalizujemo trenutni objekat data (PodaciGrida) u JSON
+            string jsonStanje = JsonSerializer.Serialize(data);
+
+            // Ubacujemo na poèetak liste u Redisu (LPUSH)
+            db.ListLeftPush("undo:stack", jsonStanje);
+
+            // Ogranièavamo listu na taèno 15 elemenata (indeksi od 0 do 14)
+            db.ListTrim("undo:stack", 0, 14);
+
+            // Kada korisnik napravi novu akciju, Redo lanac se prekida i briše
+            db.KeyDelete("redo:stack");
+        }
         private void Form1_Load(object sender, EventArgs e)
         {
             labelN.Text = "N = " + data.Visina;
@@ -35,12 +52,59 @@ namespace PrviProjekat
 
         private void undoToolStripMenuItem_Click(object sender, EventArgs e)
         {
+            var db = RedisManager.GetDatabase();
+            if (db == null) return;
+            // 1. Vadimo poslednje stanje iz undo steka (LPOP)
+            string prethodnoStanjeJson = db.ListLeftPop("undo:stack");
+            if (string.IsNullOrEmpty(prethodnoStanjeJson))
+            {
+                MessageBox.Show("Nema više koraka za Undo!", "Obaveštenje", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+            // 2. Trenutno stanje prebacujemo u redo stek pre nego što ga prepišemo
+            string trenutnoStanjeJson = JsonSerializer.Serialize(data);
+            db.ListLeftPush("redo:stack", trenutnoStanjeJson);
+            db.ListTrim("redo:stack", 0, 14);
+            // 3. Deserijalizujemo prethodno stanje u naš data objekat
+            data = JsonSerializer.Deserialize<PodaciGrida>(prethodnoStanjeJson) ?? new PodaciGrida();
+            // 4. Rekonstruišemo teren na osnovu uèitanih podataka
+            trenutniTeren = new Teren(data.Sirina, data.Visina);
+            trenutniTeren.UcitajMemoriju(data.GridBitMemorija, data.Ostrva);
+            // 5. Ažuriramo interfejs (trackbar-ove i labele)
+            trackBarM.Value = data.Sirina;
+            trackBarN.Value = data.Visina;
+            labelM.Text = "M = " + data.Sirina;
+            labelN.Text = "N = " + data.Visina;
 
+            pictureBoxTeren.Invalidate();
         }
 
         private void redoToolStripMenuItem_Click(object sender, EventArgs e)
         {
-
+            var db = RedisManager.GetDatabase();
+            if (db == null) return;
+            // 1. Vadimo stanje iz redo steka
+            string sledeceStanjeJson = db.ListLeftPop("redo:stack");
+            if (string.IsNullOrEmpty(sledeceStanjeJson))
+            {
+                MessageBox.Show("Nema više koraka za Redo!", "Obaveštenje", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+            // 2. Trenutno stanje vraæamo nazad u undo stek
+            string trenutnoStanjeJson = JsonSerializer.Serialize(data);
+            db.ListLeftPush("undo:stack", trenutnoStanjeJson);
+            db.ListTrim("undo:stack", 0, 14);
+            // 3. Deserijalizujemo sledeæe stanje
+            data = JsonSerializer.Deserialize<PodaciGrida>(sledeceStanjeJson) ?? new PodaciGrida();
+            // 4. Rekonstruišemo teren
+            trenutniTeren = new Teren(data.Sirina, data.Visina);
+            trenutniTeren.UcitajMemoriju(data.GridBitMemorija, data.Ostrva);
+            // 5. Ažuriramo labele i prikaz
+            trackBarM.Value = data.Sirina;
+            trackBarN.Value = data.Visina;
+            labelM.Text = "M = " + data.Sirina;
+            labelN.Text = "N = " + data.Visina;
+            pictureBoxTeren.Invalidate();
         }
 
         private void trackBarN_Scroll(object sender, EventArgs e)
@@ -130,21 +194,23 @@ namespace PrviProjekat
             int kliknutX = e.X / celijaSirina;
             int kliknutY = e.Y / celijaVisina;
 
-            // Provera da li je klik unutar granica grida
             if (kliknutX >= 0 && kliknutX < data.Sirina && kliknutY >= 0 && kliknutY < data.Visina)
             {
-                // Proveravamo koji taster miša je kliknut
+                // PRVO èuvamo staro stanje pre nego što ga izmenimo!
+                SacuvajStanjeZaUndo();
+
                 if (e.Button == MouseButtons.Left)
                 {
-                    // LEVI KLIK = VODA (stanje 2)
-                    trenutniTeren.PostaviStanjeCelije(kliknutX, kliknutY, 2);
+                    trenutniTeren.PostaviStanjeCelije(kliknutX, kliknutY, 2); // Voda
                 }
                 else if (e.Button == MouseButtons.Right)
                 {
-                    // DESNI KLIK = MOST (stanje 1)
-                    trenutniTeren.PostaviStanjeCelije(kliknutX, kliknutY, 1);
+                    trenutniTeren.PostaviStanjeCelije(kliknutX, kliknutY, 1); // Most
                 }
-                //Pozivamo Invalidate() da se PictureBox odmah ponovo iscrta sa novom promenom!
+
+                // Sinhronizujemo bit memoriju nazad u data objekat
+                data.GridBitMemorija = trenutniTeren.DajSvuMemoriju();
+
                 pictureBoxTeren.Invalidate();
             }
         }
