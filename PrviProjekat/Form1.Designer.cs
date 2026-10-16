@@ -44,6 +44,7 @@
             label1 = new Label();
             TerenBtn = new Button();
             btnPut = new Button();
+            label2 = new Label();
             menuStrip1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)pictureBoxTeren).BeginInit();
             ((System.ComponentModel.ISupportInitialize)trackBarN).BeginInit();
@@ -71,21 +72,24 @@
             // saveToolStripMenuItem
             // 
             saveToolStripMenuItem.Name = "saveToolStripMenuItem";
-            saveToolStripMenuItem.Size = new Size(139, 26);
+            saveToolStripMenuItem.ShortcutKeys = Keys.Control | Keys.S;
+            saveToolStripMenuItem.Size = new Size(229, 26);
             saveToolStripMenuItem.Text = "save";
             saveToolStripMenuItem.Click += saveToolStripMenuItem_Click;
             // 
             // saveAsToolStripMenuItem
             // 
             saveAsToolStripMenuItem.Name = "saveAsToolStripMenuItem";
-            saveAsToolStripMenuItem.Size = new Size(139, 26);
+            saveAsToolStripMenuItem.ShortcutKeys = Keys.Control | Keys.Shift | Keys.S;
+            saveAsToolStripMenuItem.Size = new Size(229, 26);
             saveAsToolStripMenuItem.Text = "save as";
             saveAsToolStripMenuItem.Click += saveAsToolStripMenuItem_Click;
             // 
             // openToolStripMenuItem
             // 
             openToolStripMenuItem.Name = "openToolStripMenuItem";
-            openToolStripMenuItem.Size = new Size(139, 26);
+            openToolStripMenuItem.ShortcutKeys = Keys.Control | Keys.O;
+            openToolStripMenuItem.Size = new Size(229, 26);
             openToolStripMenuItem.Text = "open";
             openToolStripMenuItem.Click += openToolStripMenuItem_Click;
             // 
@@ -186,7 +190,7 @@
             // 
             // btnPut
             // 
-            btnPut.Location = new System.Drawing.Point(672, 400);
+            btnPut.Location = new System.Drawing.Point(672, 508);
             btnPut.Name = "btnPut";
             btnPut.Size = new Size(108, 52);
             btnPut.TabIndex = 8;
@@ -194,11 +198,21 @@
             btnPut.UseVisualStyleBackColor = true;
             btnPut.Click += btnPut_Click;
             // 
+            // label2
+            // 
+            label2.AutoSize = true;
+            label2.Location = new System.Drawing.Point(565, 416);
+            label2.Name = "label2";
+            label2.Size = new Size(50, 20);
+            label2.TabIndex = 9;
+            label2.Text = "label2";
+            // 
             // Form1
             // 
             AutoScaleDimensions = new SizeF(8F, 20F);
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(832, 603);
+            Controls.Add(label2);
             Controls.Add(btnPut);
             Controls.Add(TerenBtn);
             Controls.Add(label1);
@@ -239,5 +253,6 @@
         private ToolStripMenuItem saveAsToolStripMenuItem;
         private Button TerenBtn;
         private Button btnPut;
+        private Label label2;
     }
 }

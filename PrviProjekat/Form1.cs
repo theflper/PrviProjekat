@@ -39,6 +39,8 @@ namespace PrviProjekat
             db.StringSet(kljuc, jsonNivoa);
             // 5. Èuvamo u Neo4j
             await Neo4jManager.SnimiGrafZaNivoAsync(naziv, data.Ostrva, data.Veze);
+            // 6. Odmah osvežavamo prikaz na ekranu da se brojevi pojave èim se klikne saèuvaj!
+            pictureBoxTeren.Invalidate();
             MessageBox.Show($"Nivo '{naziv}' je uspešno saèuvan (sa {data.Ostrva.Count} ostrva i {data.Veze.Count} veza)!", "Uspeh", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
@@ -62,6 +64,8 @@ namespace PrviProjekat
             RedisManager.Inicijalizuj();
             Neo4jManager.Inicijalizuj("neo4j://127.0.0.1:7687", "neo4j", "graf1234");
             trenutniTeren = new Teren(pictureBoxTeren.Width, pictureBoxTeren.Height);
+            label2.Text= "Pritiskom na dugme proveravamo \nda li postoji hamiltonov put u grafu\n" +
+                "tj. da li je moguæe obiæi sva ostrva\ntaèno jednom bez ponavljanja.\n";
         }
 
         private void fileToolStripMenuItem_Click(object sender, EventArgs e)

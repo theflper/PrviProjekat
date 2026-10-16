@@ -74,60 +74,98 @@
         public List<VezaMosta> PronadjiVezeMostova()
         {
             var veze = new List<VezaMosta>();
-            // Pomoćna funkcija koja nalazi ID ostrva na osnovu (x, y) koordinate kopna
-            int VratiIdOstrvaNaKoordinati(int x, int y)
+            if (Ostrva == null || Ostrva.Count < 2) return veze;
+
+            // Pomoćna funkcija koja proverava da li je tačka (x, y) unutar nekog ostrva i vraća njegov ID
+            int VratiIdOstrva(int x, int y)
             {
                 foreach (var ostrvo in Ostrva)
                 {
-                    // Proveravamo da li tačka (x,y) spada u bounding box ostrva
-                    // (Ako su ostrva nepravilnog oblika, ovde možemo preciznije proveriti, 
-                    // ali pošto koristiš bounding box-ove, ovo je standardna provera)
                     if (x >= ostrvo.MinX && x <= ostrvo.MaxX && y >= ostrvo.MinY && y <= ostrvo.MaxY)
                     {
-                        // Dodatna provera da li je zaista kopno na toj tački
-                        if (VratiStanjeCelije(x, y) == 0)
-                        {
-                            return ostrvo.Id;
-                        }
+                        if (VratiStanjeCelije(x, y) == 0) return ostrvo.Id;
                     }
                 }
                 return -1;
             }
-            for (int x = 0; x < Sirina; x++)
+
+            // Za svako ostrvo tražimo direktne veze prateći mostove (1)
+            foreach (var polaznoOstrvo in Ostrva)
             {
-                for (int y = 0; y < Visina; y++)
+                // Nalazimo sve obodne ćelije ovog ostrva (kopno koje graniči sa vodom/mostom)
+                var obodneCelije = new List<(int X, int Y)>();
+
+                for (int y = polaznoOstrvo.MinY; y <= polaznoOstrvo.MaxY; y++)
                 {
-                    if (VratiStanjeCelije(x, y) == 1) // Ako je polje most
+                    for (int x = polaznoOstrvo.MinX; x <= polaznoOstrvo.MaxX; x++)
                     {
-                        // Gledamo 4 suseda mosta (gore, dole, levo, desno)
+                        if (VratiStanjeCelije(x, y) == 0) // Ako je kopno ovog ostrva
+                        {
+                            int[] dx = { 0, 0, -1, 1 };
+                            int[] dy = { -1, 1, 0, 0 };
+                            for (int i = 0; i < 4; i++)
+                            {
+                                int nx = x + dx[i];
+                                int ny = y + dy[i];
+                                // Ako susedno polje postoji i nije kopno (započinje most)
+                                if (VratiStanjeCelije(nx, ny) == 1)
+                                {
+                                    obodneCelije.Add((nx, ny));
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Od svake obodne ćelije širimo se kroz mostove (1) da vidimo do kog drugog ostrva vodi
+                foreach (var pocetakMosta in obodneCelije.Distinct())
+                {
+                    bool[,] posecenoMost = new bool[Sirina, Visina];
+                    Queue<(int X, int Y)> red = new Queue<(int, int)>();
+
+                    red.Enqueue(pocetakMosta);
+                    posecenoMost[pocetakMosta.X, pocetakMosta.Y] = true;
+
+                    while (red.Count > 0)
+                    {
+                        var (trenutniX, trenutniY) = red.Dequeue();
+
                         int[] dx = { 0, 0, -1, 1 };
                         int[] dy = { -1, 1, 0, 0 };
 
-                        var susednaOstrvaIds = new List<int>();
-
                         for (int i = 0; i < 4; i++)
                         {
-                            int susedX = x + dx[i];
-                            int susedY = y + dy[i];
+                            int susedX = trenutniX + dx[i];
+                            int susedY = trenutniY + dy[i];
 
-                            int idOstrva = VratiIdOstrvaNaKoordinati(susedX, susedY);
-                            if (idOstrva != -1)
+                            if (susedX >= 0 && susedX < Sirina && susedY >= 0 && susedY < Visina)
                             {
-                                susednaOstrvaIds.Add(idOstrva);
-                            }
-                        }
-                        // Uzimamo jedinstvene ID-jeve (da ne dupliramo ako most graniči sa istim ostrvom više puta)
-                        var jedinstvenaOstrva = susednaOstrvaIds.Distinct().ToList();
+                                byte stanje = VratiStanjeCelije(susedX, susedY);
 
-                        // Ako most spaja tačno dva različita ostrva, to je validna veza
-                        if (jedinstvenaOstrva.Count == 2)
-                        {
-                            veze.Add(new VezaMosta { Ostrvo1Id = jedinstvenaOstrva[0], Ostrvo2Id = jedinstvenaOstrva[1] });
+                                if (stanje == 1 && !posecenoMost[susedX, susedY]) // Nastavljamo kroz most
+                                {
+                                    posecenoMost[susedX, susedY] = true;
+                                    red.Enqueue((susedX, susedY));
+                                }
+                                else if (stanje == 0) // Stigli smo do nekog kopna!
+                                {
+                                    int ciljniIdOstrva = VratiIdOstrva(susedX, susedY);
+                                    if (ciljniIdOstrva != -1 && ciljniIdOstrva != polaznoOstrvo.Id)
+                                    {
+                                        // Našli smo vezu između ova dva ostrva!
+                                        veze.Add(new VezaMosta
+                                        {
+                                            Ostrvo1Id = Math.Min(polaznoOstrvo.Id, ciljniIdOstrva),
+                                            Ostrvo2Id = Math.Max(polaznoOstrvo.Id, ciljniIdOstrva)
+                                        });
+                                    }
+                                }
+                            }
                         }
                     }
                 }
             }
-            // Uklanjamo duplikate veza
+            // Uklanjamo duplikate i vraćamo čiste jedinstvene veze
             return veze.DistinctBy(v => new { v.Ostrvo1Id, v.Ostrvo2Id }).ToList();
         }
         /// <summary>
