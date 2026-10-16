@@ -17,6 +17,7 @@
         public int Visina { get; set; }
         public byte[] GridBitMemorija { get; set; }
         public List<Ostrvo> Ostrva { get; set; } = new();
+        public List<VezaMosta> Veze { get; set; } = new();
         public PodaciGrida()
         {
             Sirina = 4; // Primer širine
@@ -73,36 +74,60 @@
         public List<VezaMosta> PronadjiVezeMostova()
         {
             var veze = new List<VezaMosta>();
-
-            // Prolazimo kroz sve ćelije grida da nađemo mostove (vrednost 1)
+            // Pomoćna funkcija koja nalazi ID ostrva na osnovu (x, y) koordinate kopna
+            int VratiIdOstrvaNaKoordinati(int x, int y)
+            {
+                foreach (var ostrvo in Ostrva)
+                {
+                    // Proveravamo da li tačka (x,y) spada u bounding box ostrva
+                    // (Ako su ostrva nepravilnog oblika, ovde možemo preciznije proveriti, 
+                    // ali pošto koristiš bounding box-ove, ovo je standardna provera)
+                    if (x >= ostrvo.MinX && x <= ostrvo.MaxX && y >= ostrvo.MinY && y <= ostrvo.MaxY)
+                    {
+                        // Dodatna provera da li je zaista kopno na toj tački
+                        if (VratiStanjeCelije(x, y) == 0)
+                        {
+                            return ostrvo.Id;
+                        }
+                    }
+                }
+                return -1;
+            }
             for (int x = 0; x < Sirina; x++)
             {
                 for (int y = 0; y < Visina; y++)
                 {
-                    if (VratiStanjeCelije(x, y) == 1) // Ako je most
+                    if (VratiStanjeCelije(x, y) == 1) // Ako je polje most
                     {
-                        // Proveravamo susede (gore, dole, levo, desno) da vidimo koja ostrva ovaj most spaja
-                        var susednaOstrvaIds =
-                            new int[] {
-                        VratiStanjeCelije(x - 1, y),
-                        VratiStanjeCelije(x + 1, y),
-                        VratiStanjeCelije(x, y - 1),
-                        VratiStanjeCelije(x, y + 1)
-                            }
-                            .Where(id => id != -1)
-                            .Distinct()
-                            .ToList();
+                        // Gledamo 4 suseda mosta (gore, dole, levo, desno)
+                        int[] dx = { 0, 0, -1, 1 };
+                        int[] dy = { -1, 1, 0, 0 };
 
-                        // Ako most spaja tačno dva različita ostrva, to je validna veza!
-                        if (susednaOstrvaIds.Count == 2)
+                        var susednaOstrvaIds = new List<int>();
+
+                        for (int i = 0; i < 4; i++)
                         {
-                            veze.Add(new VezaMosta { Ostrvo1Id = susednaOstrvaIds[0], Ostrvo2Id = susednaOstrvaIds[1] });
+                            int susedX = x + dx[i];
+                            int susedY = y + dy[i];
+
+                            int idOstrva = VratiIdOstrvaNaKoordinati(susedX, susedY);
+                            if (idOstrva != -1)
+                            {
+                                susednaOstrvaIds.Add(idOstrva);
+                            }
+                        }
+                        // Uzimamo jedinstvene ID-jeve (da ne dupliramo ako most graniči sa istim ostrvom više puta)
+                        var jedinstvenaOstrva = susednaOstrvaIds.Distinct().ToList();
+
+                        // Ako most spaja tačno dva različita ostrva, to je validna veza
+                        if (jedinstvenaOstrva.Count == 2)
+                        {
+                            veze.Add(new VezaMosta { Ostrvo1Id = jedinstvenaOstrva[0], Ostrvo2Id = jedinstvenaOstrva[1] });
                         }
                     }
                 }
             }
-
-            // Uklanjamo duplikate ako most zauzima više polja između istih ostrva
+            // Uklanjamo duplikate veza
             return veze.DistinctBy(v => new { v.Ostrvo1Id, v.Ostrvo2Id }).ToList();
         }
         /// <summary>

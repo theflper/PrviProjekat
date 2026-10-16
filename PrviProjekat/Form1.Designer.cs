@@ -43,6 +43,7 @@
             labelM = new Label();
             label1 = new Label();
             TerenBtn = new Button();
+            btnPut = new Button();
             menuStrip1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)pictureBoxTeren).BeginInit();
             ((System.ComponentModel.ISupportInitialize)trackBarN).BeginInit();
@@ -99,7 +100,7 @@
             // 
             undoToolStripMenuItem.Name = "undoToolStripMenuItem";
             undoToolStripMenuItem.ShortcutKeys = Keys.Control | Keys.Z;
-            undoToolStripMenuItem.Size = new Size(224, 26);
+            undoToolStripMenuItem.Size = new Size(177, 26);
             undoToolStripMenuItem.Text = "undo";
             undoToolStripMenuItem.Click += undoToolStripMenuItem_Click;
             // 
@@ -107,7 +108,7 @@
             // 
             redoToolStripMenuItem.Name = "redoToolStripMenuItem";
             redoToolStripMenuItem.ShortcutKeys = Keys.Control | Keys.Y;
-            redoToolStripMenuItem.Size = new Size(224, 26);
+            redoToolStripMenuItem.Size = new Size(177, 26);
             redoToolStripMenuItem.Text = "redo";
             redoToolStripMenuItem.Click += redoToolStripMenuItem_Click;
             // 
@@ -177,17 +178,28 @@
             // 
             TerenBtn.Location = new System.Drawing.Point(672, 256);
             TerenBtn.Name = "TerenBtn";
-            TerenBtn.Size = new Size(108, 43);
+            TerenBtn.Size = new Size(108, 53);
             TerenBtn.TabIndex = 7;
             TerenBtn.Text = "Kreiraj teren";
             TerenBtn.UseVisualStyleBackColor = true;
             TerenBtn.Click += TerenBtn_Click;
+            // 
+            // btnPut
+            // 
+            btnPut.Location = new System.Drawing.Point(672, 400);
+            btnPut.Name = "btnPut";
+            btnPut.Size = new Size(108, 52);
+            btnPut.TabIndex = 8;
+            btnPut.Text = "Proveri put";
+            btnPut.UseVisualStyleBackColor = true;
+            btnPut.Click += btnPut_Click;
             // 
             // Form1
             // 
             AutoScaleDimensions = new SizeF(8F, 20F);
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(832, 603);
+            Controls.Add(btnPut);
             Controls.Add(TerenBtn);
             Controls.Add(label1);
             Controls.Add(labelM);
@@ -226,5 +238,6 @@
         private Label label1;
         private ToolStripMenuItem saveAsToolStripMenuItem;
         private Button TerenBtn;
+        private Button btnPut;
     }
 }

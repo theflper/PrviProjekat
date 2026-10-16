@@ -11,12 +11,11 @@ namespace PrviProjekat
         PodaciGrida data = new PodaciGrida();
         Teren trenutniTeren;
         private string trenutniNazivNivoa = "";
-        private void SnimiNivoURedis(string naziv)
+        private async void SnimiNivoURedis(string naziv)
         {
             var db = RedisManager.GetDatabase();
             if (db == null) return;
             string kljuc = $"nivo:{naziv}";
-            // Proveravamo da li nivo sa tim imenom veæ postoji u Redis bazi
             if (db.KeyExists(kljuc))
             {
                 var rezultat = MessageBox.Show(
@@ -25,21 +24,24 @@ namespace PrviProjekat
                     MessageBoxButtons.YesNo,
                     MessageBoxIcon.Warning);
 
-                // Ako korisnik izabere "No", prekidamo èuvanje i vraæamo ga nazad (ili nudimo Save As)
-                if (rezultat == DialogResult.No)
-                {
-                    return;
-                }
+                if (rezultat == DialogResult.No) return;
             }
-            // Ažuriramo stanje grida i ostrva pre èuvanja
+            // 1. Sinhronizujemo bit memoriju iz terena
             data.GridBitMemorija = trenutniTeren.DajSvuMemoriju();
+            // 2. OBAVEZNO DETEKTUJEMO OSTRVA
+            trenutniTeren.DetektujOstrva();
             data.Ostrva = trenutniTeren.Ostrva;
-
+            // 3. OBAVEZNO NALAZIMO VEZE (MOSTOVE) IZMEÐU OSTRVA
+            data.Veze = trenutniTeren.PronadjiVezeMostova();
+            // Sada data.Veze više nisu prazne ukoliko su mostovi spojili dva ostrva!
+            // 4. Èuvamo u Redis (JSON sada sadrži i veze)
             string jsonNivoa = JsonSerializer.Serialize(data);
             db.StringSet(kljuc, jsonNivoa);
-
-            MessageBox.Show($"Nivo '{naziv}' je uspešno saèuvan u Redis bazu!", "Uspeh", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            // 5. Èuvamo u Neo4j
+            await Neo4jManager.SnimiGrafZaNivoAsync(naziv, data.Ostrva, data.Veze);
+            MessageBox.Show($"Nivo '{naziv}' je uspešno saèuvan (sa {data.Ostrva.Count} ostrva i {data.Veze.Count} veza)!", "Uspeh", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
+
         private void SacuvajStanjeZaUndo()
         {
             var db = RedisManager.GetDatabase();
@@ -58,7 +60,7 @@ namespace PrviProjekat
             labelN.Text = "N = " + data.Visina;
             labelM.Text = "M = " + data.Sirina;
             RedisManager.Inicijalizuj();
-            Neo4jManager.Inicijalizuj("neo4j://127.0.0.1:7687", "neo4j", "tvoja_lozinka");
+            Neo4jManager.Inicijalizuj("neo4j://127.0.0.1:7687", "neo4j", "graf1234");
             trenutniTeren = new Teren(pictureBoxTeren.Width, pictureBoxTeren.Height);
         }
 
@@ -200,14 +202,12 @@ namespace PrviProjekat
         private void pictureBoxTeren_Paint(object sender, PaintEventArgs e)
         {
             Graphics g = e.Graphics;
-            // 1. Dimenzije PictureBox-a
             int sirinaPB = pictureBoxTeren.Width;
             int visinaPB = pictureBoxTeren.Height;
-            // Zaštita od deljenja sa nulom (ako vrednosti nekako budu 0)
-            if (data.Visina <= 0 || data.Visina <= 0) return;
-            // 3. Izraèunavanje velièine jedne æelije u pikselima
+            if (data.Visina <= 0 || data.Sirina <= 0) return;
             int celijaSirina = (int)Math.Floor((double)sirinaPB / data.Sirina);
             int celijaVisina = (int)Math.Floor((double)visinaPB / data.Visina);
+            // 1. Crtanje grid æelija (kopno, voda, mostovi)
             for (int y = 0; y < data.Visina; y++)
             {
                 for (int x = 0; x < data.Sirina; x++)
@@ -215,31 +215,46 @@ namespace PrviProjekat
                     int xPiksel = x * celijaSirina;
                     int yPiksel = y * celijaVisina;
                     Rectangle rect = new Rectangle(xPiksel, yPiksel, celijaSirina, celijaVisina);
-                    // Preuzimamo stanje iz naše instance klase Teren (pretpostavimo da se zove 'trenutniTeren')
-                    // Ako još uvek nemaš instanciran teren u formi, za test možeš proveriti preko neke matrice, 
-                    // ali ovako izgleda poziv sa tvojom klasom:
+
                     byte stanje = trenutniTeren.VratiStanjeCelije(x, y);
                     if (stanje == 0)
                     {
-                        // Kopno - Zeleno
                         g.FillRectangle(Brushes.SeaGreen, rect);
                     }
                     else if (stanje == 2)
                     {
-                        // Voda - Plavo
                         g.FillRectangle(Brushes.LightSkyBlue, rect);
                     }
                     else if (stanje == 1)
                     {
-                        // Most - Sivo polje sa crnim X
                         g.FillRectangle(Brushes.Gray, rect);
-
-                        // Crtanje crnog X unutar pravougaonika mosta
                         g.DrawLine(Pens.Black, rect.Left, rect.Top, rect.Right, rect.Bottom);
                         g.DrawLine(Pens.Black, rect.Right, rect.Top, rect.Left, rect.Bottom);
-                        // Crne ivice mreže
                         g.DrawRectangle(Pens.Black, rect);
                     }
+                }
+            }
+            // 2. Crtanje brojeva (ID-jeva) preko detektovanih ostrva
+            if (data.Ostrva != null)
+            {
+                using Font fontOstrva = new Font("Segoe UI", 10, FontStyle.Bold);
+                using StringFormat format = new StringFormat()
+                {
+                    Alignment = StringAlignment.Center,
+                    LineAlignment = StringAlignment.Center
+                };
+                foreach (var ostrvo in data.Ostrva)
+                {
+                    // Izraèunavamo centar bounding box-a ostrva u pikselima
+                    int centarX = (ostrvo.MinX + ostrvo.MaxX + 1) * celijaSirina / 2;
+                    int centarY = (ostrvo.MinY + ostrvo.MaxY + 1) * celijaVisina / 2;
+                    // Malo pomeramo pravougaonik za ispis teksta
+                    Rectangle rectTekst = new Rectangle(centarX - 15, centarY - 15, 30, 30);
+                    // Crtamo belu pozadinu kružiæa/kvadratiæa da se broj lepo vidi preko zelene boje
+                    g.FillEllipse(Brushes.White, rectTekst);
+                    g.DrawEllipse(Pens.Black, rectTekst);
+                    // Ispisujemo ID ostrva
+                    g.DrawString(ostrvo.Id.ToString(), fontOstrva, Brushes.Black, rectTekst, format);
                 }
             }
         }
@@ -279,6 +294,28 @@ namespace PrviProjekat
             trenutniTeren = new Teren(data.Sirina, data.Visina);
             trenutniNazivNivoa = "";
             pictureBoxTeren.Invalidate();
+        }
+
+        private async void btnPut_Click(object sender, EventArgs e)
+        {
+            if (string.IsNullOrEmpty(trenutniNazivNivoa))
+            {
+                MessageBox.Show("Molimo vas saèuvajte ili uèitajte nivo pre analize!", "Obaveštenje", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            // Pozivamo Neo4j analizu
+            List<int> putanja = await Neo4jManager.PronadjiHamiltonovPutAsync(trenutniNazivNivoa);
+            if (putanja.Count > 0)
+            {
+                string redosled = string.Join(" -> ", putanja);
+                MessageBox.Show($"Uspeh! Pronaðen je Hamiltonov put.\n\nRedosled obilaska ostrva:\n{redosled}",
+                    "Topološka analiza", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            else
+            {
+                MessageBox.Show("Nije moguæe obiæi sva ostrva taèno jednom (Hamiltonov put ne postoji za trenutne veze).",
+                    "Topološka analiza", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
         }
     }
 }
